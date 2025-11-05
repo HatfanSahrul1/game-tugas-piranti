@@ -6,15 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Login.unity
+    guid: c8881a83db926554bb40d6e27cfa13b7
+  - enabled: 1
+    path: Assets/Scenes/Daftar.unity
+    guid: c40388be2cd63154e8b585b1984be5a8
+  - enabled: 1
     path: Assets/Scenes/MainMenu.unity
     guid: 6c330321615770944b0019cf06a2cb73
   - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 2cda990e2423bbf4892e6590ba056729
-  - enabled: 1
-    path: Assets/Scenes/Daftar.unity
-    guid: c40388be2cd63154e8b585b1984be5a8
-  - enabled: 1
-    path: Assets/Scenes/Login.unity
-    guid: c8881a83db926554bb40d6e27cfa13b7
   m_configObjects: {}

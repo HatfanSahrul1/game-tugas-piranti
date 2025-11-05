@@ -10,14 +10,14 @@ public class MainMenuManager : MonoBehaviour
     [Header("Scene")]
     public string sceneToLoad = "SampleScene";
 
-    private void Update()
-    {
-        // Start the game on any key or mouse button press
-        if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
-        {
-            StartGame();
-        }
-    }
+    // private void Update()
+    // {
+    //     // Start the game on any key or mouse button press
+    //     if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
+    //     {
+    //         StartGame();
+    //     }
+    // }
 
     public void StartGame()
     {
