@@ -15,4 +15,13 @@ public class SkinPicker : MonoBehaviour
         index = (index + 1) % skins.Length;
         spriteRenderer.sprite = skins[index];
     }
+
+    public void SetSkin(int skinIndex)
+    {
+        if (skinIndex >= 0 && skinIndex < skins.Length)
+        {
+            index = skinIndex;
+            spriteRenderer.sprite = skins[index];
+        }
+    }
 }
