@@ -27,19 +27,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform planeVisual;
     [SerializeField] private float rotationSpeed = 180f;
     
-    // Input System Components
-    private PlayerInput playerInput;
-    private InputAction aimAction;
-    private InputAction boostAction;
-    
-    // Smart Input System (built-in)
-    [Header("Smart Input Settings")]
-    [SerializeField] private float gamepadThreshold = 0.1f;
-    [SerializeField] private float gamepadTimeout = 2f;
+    // Input System - Custom Input Manager
+    [Header("Input Settings")]
+    [SerializeField] private CustomInputManager inputManager;
     [SerializeField] private bool enableInputDebug = false;
-    
-    private bool gamepadActive = false;
-    private float lastGamepadTime = 0f;
     
     // Movement Components
     private Rigidbody2D rb;
@@ -73,37 +64,41 @@ public class PlayerController : MonoBehaviour
     {
         // Initialize components
         rb = GetComponent<Rigidbody2D>();
-        playerInput = GetComponent<PlayerInput>();
         mainCamera = Camera.main;
         
         if (mainCamera == null)
             mainCamera = FindObjectOfType<Camera>();
         
-        // Setup input actions
-        if (playerInput != null)
-        {
-            aimAction = playerInput.actions["Aim"];
-            boostAction = playerInput.actions["Boost"];
-        }
+        // Auto-find CustomInputManager if not assigned
+        if (inputManager == null)
+            inputManager = FindObjectOfType<CustomInputManager>();
     }
     
     private void OnEnable()
     {
-        // Subscribe to input events
-        if (boostAction != null)
+        // Subscribe to input manager events if available
+        if (inputManager != null)
         {
-            boostAction.performed += OnBoostPerformed;
-            boostAction.canceled += OnBoostCanceled;
+            inputManager.OnInputDeviceChanged += OnInputDeviceChanged;
         }
     }
     
     private void OnDisable()
     {
-        // Unsubscribe from input events
-        if (boostAction != null)
+        // Unsubscribe from input manager events
+        if (inputManager != null)
         {
-            boostAction.performed -= OnBoostPerformed;
-            boostAction.canceled -= OnBoostCanceled;
+            inputManager.OnInputDeviceChanged -= OnInputDeviceChanged;
+        }
+    }
+    
+    private void OnInputDeviceChanged(bool isUsingGamepad)
+    {
+        if (enableInputDebug)
+        {
+            string deviceType = inputManager.IsUsingSteeringWheel ? "Steering Wheel" : 
+                              (isUsingGamepad ? "Gamepad" : "Mouse/Keyboard");
+            Debug.Log($"PlayerController: Input device changed to {deviceType}");
         }
     }
     
@@ -126,64 +121,49 @@ public class PlayerController : MonoBehaviour
     
     private void HandleInput()
     {
-    // Smart Input System - Built-in gamepad priority
+        if (inputManager == null) return;
         
-        // Check gamepad input first
-        if (Gamepad.current != null)
+        // Get input from CustomInputManager
+        Vector2 aimInput = inputManager.GetAimInput();
+        
+        if (inputManager.IsUsingSteeringWheel)
         {
-            Vector2 gamepadInput = Gamepad.current.leftStick.ReadValue();
-            
-            if (gamepadInput.magnitude > gamepadThreshold)
+            // Steering wheel: convert horizontal input to direction
+            float steering = aimInput.x;
+            if (Mathf.Abs(steering) > 0.1f)
             {
-                lastGamepadTime = Time.time;
-
-                if (!gamepadActive && enableInputDebug)
-                {
-                    Debug.Log("Switched to Gamepad input");
-                }
-
-                gamepadActive = true;
-                targetDirection = gamepadInput.normalized;
+                // Calculate direction based on current velocity + steering
+                Vector2 currentDir = rb.velocity.normalized;
+                if (currentDir.magnitude < 0.1f) currentDir = transform.up; // fallback direction
                 
-                // Gamepad boost
-                if (Gamepad.current.rightShoulder.wasPressedThisFrame && canBoost && !isBoosting)
+                float currentAngle = Mathf.Atan2(currentDir.y, currentDir.x);
+                float steeringAngle = steering * 2f * Time.deltaTime; // adjust steering sensitivity
+                float newAngle = currentAngle + steeringAngle;
+                
+                targetDirection = new Vector2(Mathf.Cos(newAngle), Mathf.Sin(newAngle));
+                
+                if (enableInputDebug)
                 {
-                    StartBoost();
+                    Debug.Log($"Steering Wheel Input: {steering:F2}, Target Direction: {targetDirection}");
                 }
             }
-        }
-        
-        // Auto-switch back to mouse if gamepad inactive
-        if (gamepadActive && Time.time - lastGamepadTime > gamepadTimeout)
-        {
-            if (enableInputDebug)
+            else
             {
-                Debug.Log("Gamepad timeout - switched to Mouse input");
+                // No steering input, maintain current direction or stop
+                targetDirection = rb.velocity.normalized;
+                if (targetDirection.magnitude < 0.1f) targetDirection = Vector2.zero;
             }
-            gamepadActive = false;
         }
-        
-        // Handle mouse input (only if gamepad not active)
-        if (!gamepadActive)
+        else if (inputManager.IsUsingGamepad)
         {
-            if (Mouse.current != null && Mouse.current.position.ReadValue() != Vector2.zero)
+            // Gamepad: direct stick input
+            if (aimInput.magnitude > 0.1f)
             {
-                Vector2 mouseWorldPos = mainCamera.ScreenToWorldPoint(Mouse.current.position.ReadValue());
-                Vector2 direction = (mouseWorldPos - (Vector2)transform.position);
+                targetDirection = aimInput.normalized;
                 
-                if (direction.magnitude > 0.1f)
+                if (enableInputDebug)
                 {
-                    targetDirection = direction.normalized;
-                }
-                else
-                {
-                    targetDirection = Vector2.zero;
-                }
-                
-                // Mouse boost
-                if (Mouse.current.leftButton.wasPressedThisFrame && canBoost && !isBoosting)
-                {
-                    StartBoost();
+                    Debug.Log($"Gamepad Input: {aimInput}, Target Direction: {targetDirection}");
                 }
             }
             else
@@ -191,20 +171,42 @@ public class PlayerController : MonoBehaviour
                 targetDirection = Vector2.zero;
             }
         }
-    }
-    
-    private void OnBoostPerformed(InputAction.CallbackContext context)
-    {
-        if (canBoost && !isBoosting)
+        else
+        {
+            // Mouse: convert screen to world position
+            if (aimInput != Vector2.zero)
+            {
+                Vector2 mouseWorldPos = mainCamera.ScreenToWorldPoint(aimInput);
+                Vector2 direction = (mouseWorldPos - (Vector2)transform.position);
+                
+                if (direction.magnitude > 0.1f)
+                {
+                    targetDirection = direction.normalized;
+                    
+                    if (enableInputDebug)
+                    {
+                        Debug.Log($"Mouse Input: {aimInput}, Target Direction: {targetDirection}");
+                    }
+                }
+                else
+                {
+                    targetDirection = Vector2.zero;
+                }
+            }
+            else
+            {
+                targetDirection = Vector2.zero;
+            }
+        }
+        
+        // Handle boost input
+        if (inputManager.GetBoostInputDown() && canBoost && !isBoosting)
         {
             StartBoost();
         }
     }
     
-    private void OnBoostCanceled(InputAction.CallbackContext context)
-    {
-        // Boost bisa dihentikan lebih awal jika diperlukan
-    }
+
     
     #endregion
     

@@ -27,7 +27,7 @@
             "bindings": [
                 {
                     "name": "",
-                    "id": "f486cca5-5275-443c-b5ef-b6125be13e39",
+                    "id": "28566f4b-709f-45e9-ad31-67eed0dc0e07",
                     "path": "<Mouse>/position",
                     "interactions": "",
                     "processors": "",
@@ -46,6 +46,39 @@
                     "action": "Aim",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e17a744f-2f8c-4b33-9cf3-7e3567caf87c",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "2D Vector",
+                    "id": "8dde24bc-93a6-45f9-9c9b-4edcc01b9eb4",
+                    "path": "2DVector",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "left",
+                    "id": "703a0558-78ae-43bd-a00b-cd7b652b5128",
+                    "path": "<HID::Steering Wheel>/stick/x",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim",
+                    "isComposite": false,
+                    "isPartOfComposite": true
                 },
                 {
                     "name": "",

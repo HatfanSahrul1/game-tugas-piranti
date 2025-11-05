@@ -1058,7 +1058,7 @@ GameObject:
   - component: {fileID: 1012780297}
   - component: {fileID: 1012780296}
   m_Layer: 5
-  m_Name: buat
+  m_Name: daftar
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1128,13 +1128,13 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1304167250}
-        m_TargetAssemblyTypeName: Daftar, Assembly-CSharp
-        m_MethodName: RegisterUser
+      - m_Target: {fileID: 1304167247}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_ObjectArgumentAssemblyTypeName: 
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
@@ -1551,6 +1551,8 @@ MonoBehaviour:
   usernameInput: {fileID: 1909183499}
   passwordInput: {fileID: 221524992}
   confirmPasswordInput: {fileID: 1201861731}
+  loginSceneName: Login
+  statusText: {fileID: 0}
 --- !u!114 &1304167251
 MonoBehaviour:
   m_ObjectHideFlags: 0

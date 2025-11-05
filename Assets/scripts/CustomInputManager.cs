@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.HID;
 
 /// <summary>
 /// Manager untuk menangani prioritas input antara mouse dan gamepad
@@ -17,9 +18,10 @@ public class CustomInputManager : MonoBehaviour
     
     public enum InputDeviceType
     {
-        Auto,       // Otomatis switch berdasarkan input terakhir
-        MouseOnly,  // Hanya mouse
-        GamepadOnly // Hanya gamepad
+        Auto,             // Otomatis switch berdasarkan input terakhir
+        MouseOnly,        // Hanya mouse
+        GamepadOnly,      // Hanya gamepad
+        SteeringWheelOnly // Hanya steering wheel
     }
     
     // Events untuk memberitahu script lain tentang perubahan input
@@ -28,13 +30,19 @@ public class CustomInputManager : MonoBehaviour
     // Input state
     private bool isUsingGamepad = false;
     private bool gamepadConnected = false;
+    private bool steeringWheelConnected = false;
+    private bool isUsingSteeringWheel = false;
     private float lastGamepadInputTime;
+    private float lastSteeringWheelInputTime;
     private Vector2 lastGamepadInput;
     private Vector2 lastMousePosition;
+    private float lastSteeringInput;
     
     // Properties
     public bool IsUsingGamepad => isUsingGamepad;
+    public bool IsUsingSteeringWheel => isUsingSteeringWheel;
     public bool GamepadConnected => gamepadConnected;
+    public bool SteeringWheelConnected => steeringWheelConnected;
     public InputDeviceType CurrentInputType => preferredInputType;
     
     // Singleton pattern (opsional)
@@ -89,27 +97,74 @@ public class CustomInputManager : MonoBehaviour
     
     private void InitializeInputDetection()
     {
+        // Deteksi steering wheel
+        DetectSteeringWheel();
+        
         // Check if gamepad is already connected
         gamepadConnected = Gamepad.current != null;
         
         // Set initial input type
         if (preferredInputType == InputDeviceType.Auto)
         {
-            isUsingGamepad = gamepadConnected;
+            isUsingSteeringWheel = steeringWheelConnected;
+            isUsingGamepad = gamepadConnected && !steeringWheelConnected;
+        }
+        else if (preferredInputType == InputDeviceType.SteeringWheelOnly)
+        {
+            isUsingSteeringWheel = true;
+            isUsingGamepad = false;
         }
         else
         {
             isUsingGamepad = preferredInputType == InputDeviceType.GamepadOnly;
+            isUsingSteeringWheel = false;
         }
         
         if (enableDebugLog)
         {
-            Debug.Log($"InputManager initialized. Gamepad connected: {gamepadConnected}, Using gamepad: {isUsingGamepad}");
+            Debug.Log($"InputManager initialized. Gamepad connected: {gamepadConnected}, Steering Wheel connected: {steeringWheelConnected}, Using steering wheel: {isUsingSteeringWheel}");
+        }
+    }
+    
+    private void DetectSteeringWheel()
+    {
+        steeringWheelConnected = false;
+        
+        foreach (var device in InputSystem.devices)
+        {
+            if (device is HID hidDevice)
+            {
+                string productName = hidDevice.description.product?.ToLower() ?? "";
+                string interfaceName = hidDevice.description.interfaceName?.ToLower() ?? "";
+                
+                // Check for common steering wheel identifiers
+                if (productName.Contains("wheel") || productName.Contains("racing") || 
+                    productName.Contains("driving") || interfaceName.Contains("steering") ||
+                    productName.Contains("g29") || productName.Contains("g920") || 
+                    productName.Contains("t150") || productName.Contains("t300"))
+                {
+                    steeringWheelConnected = true;
+                    if (enableDebugLog)
+                    {
+                        Debug.Log($"Steering Wheel detected: {hidDevice.description.product}");
+                    }
+                    return;
+                }
+            }
         }
     }
     
     private void UpdateInputDetection()
     {
+        // Update steering wheel connection status
+        bool wasSteeringWheelConnected = steeringWheelConnected;
+        DetectSteeringWheel();
+        
+        if (wasSteeringWheelConnected != steeringWheelConnected && enableDebugLog)
+        {
+            Debug.Log($"Steering Wheel {(steeringWheelConnected ? "connected" : "disconnected")}");
+        }
+        
         // Update gamepad connection status
         bool wasConnected = gamepadConnected;
         gamepadConnected = Gamepad.current != null;
@@ -122,6 +177,29 @@ public class CustomInputManager : MonoBehaviour
         
         // Don't process input if forced to specific type
         if (preferredInputType != InputDeviceType.Auto) return;
+        
+        // Jika steering wheel terhubung, prioritaskan steering wheel
+        if (steeringWheelConnected)
+        {
+            // Check for steering wheel input (using gamepad as fallback for now)
+            if (gamepadConnected)
+            {
+                Vector2 steeringInput = Gamepad.current.leftStick.ReadValue();
+                bool steeringButtonPressed = Gamepad.current.buttonSouth.isPressed || 
+                                           Gamepad.current.rightShoulder.isPressed;
+                
+                if (Mathf.Abs(steeringInput.x) > gamepadDeadZone || steeringButtonPressed)
+                {
+                    lastSteeringWheelInputTime = Time.time;
+                    lastSteeringInput = steeringInput.x;
+                    
+                    if (!isUsingSteeringWheel)
+                    {
+                        SwitchToSteeringWheel();
+                    }
+                }
+            }
+        }
         
         // Check gamepad input
         if (gamepadConnected)
@@ -178,7 +256,7 @@ public class CustomInputManager : MonoBehaviour
         switch (preferredInputType)
         {
             case InputDeviceType.MouseOnly:
-                if (isUsingGamepad)
+                if (isUsingGamepad || isUsingSteeringWheel)
                 {
                     SwitchToMouse();
                 }
@@ -188,6 +266,13 @@ public class CustomInputManager : MonoBehaviour
                 if (!isUsingGamepad && gamepadConnected)
                 {
                     SwitchToGamepad();
+                }
+                break;
+                
+            case InputDeviceType.SteeringWheelOnly:
+                if (!isUsingSteeringWheel && steeringWheelConnected)
+                {
+                    SwitchToSteeringWheel();
                 }
                 break;
         }
@@ -212,14 +297,29 @@ public class CustomInputManager : MonoBehaviour
     
     private void SwitchToMouse()
     {
-        if (!isUsingGamepad) return;
+        if (!isUsingGamepad && !isUsingSteeringWheel) return;
         
         isUsingGamepad = false;
+        isUsingSteeringWheel = false;
         OnInputDeviceChanged?.Invoke(false);
         
         if (enableDebugLog)
         {
             Debug.Log("Switched to Mouse input");
+        }
+    }
+    
+    private void SwitchToSteeringWheel()
+    {
+        if (isUsingSteeringWheel) return;
+        
+        isUsingGamepad = false;
+        isUsingSteeringWheel = true;
+        OnInputDeviceChanged?.Invoke(true);
+        
+        if (enableDebugLog)
+        {
+            Debug.Log("Switched to Steering Wheel input");
         }
     }
     
@@ -263,7 +363,17 @@ public class CustomInputManager : MonoBehaviour
     /// </summary>
     public Vector2 GetAimInput()
     {
-        if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && preferredInputType == InputDeviceType.Auto))
+        if (preferredInputType == InputDeviceType.SteeringWheelOnly || (isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
+        {
+            // Return steering wheel input (horizontal axis only)
+            if (gamepadConnected)
+            {
+                float steeringAxis = Gamepad.current.leftStick.x.ReadValue();
+                return new Vector2(steeringAxis, 0f);
+            }
+            return Vector2.zero;
+        }
+        else if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && !isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
         {
             // Return mouse input (akan diconvert ke world space di PlayerController)
             return Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
@@ -282,7 +392,11 @@ public class CustomInputManager : MonoBehaviour
     /// </summary>
     public bool GetBoostInput()
     {
-        if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && preferredInputType == InputDeviceType.Auto))
+        if (preferredInputType == InputDeviceType.SteeringWheelOnly || (isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
+        {
+            return gamepadConnected && Gamepad.current.rightShoulder.isPressed;
+        }
+        else if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && !isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
         {
             return Mouse.current != null && Mouse.current.leftButton.isPressed;
         }
@@ -299,7 +413,11 @@ public class CustomInputManager : MonoBehaviour
     /// </summary>
     public bool GetBoostInputDown()
     {
-        if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && preferredInputType == InputDeviceType.Auto))
+        if (preferredInputType == InputDeviceType.SteeringWheelOnly || (isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
+        {
+            return gamepadConnected && Gamepad.current.rightShoulder.wasPressedThisFrame;
+        }
+        else if (preferredInputType == InputDeviceType.MouseOnly || (!isUsingGamepad && !isUsingSteeringWheel && preferredInputType == InputDeviceType.Auto))
         {
             return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
         }
@@ -329,6 +447,12 @@ public class CustomInputManager : MonoBehaviour
                     SwitchToGamepad();
                 }
                 break;
+            case InputDeviceType.SteeringWheelOnly:
+                if (steeringWheelConnected)
+                {
+                    SwitchToSteeringWheel();
+                }
+                break;
             case InputDeviceType.Auto:
                 // Let the auto detection handle it
                 break;
@@ -356,12 +480,15 @@ public class CustomInputManager : MonoBehaviour
     {
         if (!enableDebugLog || !Application.isPlaying) return;
         
-        GUILayout.BeginArea(new Rect(10, Screen.height - 150, 300, 140));
+        GUILayout.BeginArea(new Rect(10, Screen.height - 180, 300, 170));
         GUILayout.Label("=== INPUT MANAGER DEBUG ===");
-        GUILayout.Label($"Current Input: {(isUsingGamepad ? "GAMEPAD" : "MOUSE")}");
+        string currentInput = isUsingSteeringWheel ? "STEERING WHEEL" : (isUsingGamepad ? "GAMEPAD" : "MOUSE");
+        GUILayout.Label($"Current Input: {currentInput}");
         GUILayout.Label($"Gamepad Connected: {gamepadConnected}");
+        GUILayout.Label($"Steering Wheel Connected: {steeringWheelConnected}");
         GUILayout.Label($"Input Type: {preferredInputType}");
         GUILayout.Label($"Last Gamepad Input: {Time.time - lastGamepadInputTime:F1}s ago");
+        GUILayout.Label($"Last Steering Input: {Time.time - lastSteeringWheelInputTime:F1}s ago");
         
         if (gamepadConnected && Gamepad.current != null)
         {
