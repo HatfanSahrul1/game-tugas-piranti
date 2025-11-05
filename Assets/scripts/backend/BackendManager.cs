@@ -12,6 +12,7 @@ public class BackendManager : MonoBehaviour
     public static event Action<bool, string, PlayerData> OnUserLoggedIn; // success, message, playerData
     public static event Action<bool, string> OnAttributesCreated; // success, message
     public static event Action<bool, string, PlayerAttributes> OnAttributesLoaded; // success, message, attributes
+    public static event Action<bool, string> OnAttributesUpdated; // success, message
 
     // Example usage
     // void Start()
@@ -57,6 +58,13 @@ public class BackendManager : MonoBehaviour
     public void GetAttributes(int playerId)
     {
         StartCoroutine(GetRequestForAttributes($"{baseUrl}/user_data/{playerId}"));
+    }
+    
+    // Update Attributes
+    public void UpdateAttributes(int playerId, int score, int coin, int greenSkin, int redSkin, int blueSkin)
+    {
+        UpdateAttributesData data = new UpdateAttributesData(score, coin, greenSkin, redSkin, blueSkin);
+        StartCoroutine(PostRequestForUpdateAttributes($"{baseUrl}/update_attributes/{playerId}", data));
     }
 
     // Coroutine for GET request
@@ -328,6 +336,83 @@ public class BackendManager : MonoBehaviour
         public int greenSkin = 0;
         public int redSkin = 0;
         public int blueSkin = 0;
+    }
+    
+    [System.Serializable]
+    private class UpdateAttributesData
+    {
+        public int score;
+        public int coin;
+        public int greenSkin;
+        public int redSkin;
+        public int blueSkin;
+
+        public UpdateAttributesData(int score, int coin, int greenSkin, int redSkin, int blueSkin)
+        {
+            this.score = score;
+            this.coin = coin;
+            this.greenSkin = greenSkin;
+            this.redSkin = redSkin;
+            this.blueSkin = blueSkin;
+        }
+    }
+    
+    // Specialized POST request for updating attributes
+    private IEnumerator PostRequestForUpdateAttributes(string url, UpdateAttributesData data)
+    {
+        Debug.Log($"Sending POST request to: {url}");
+        
+        string jsonData = JsonUtility.ToJson(data);
+        Debug.Log($"JSON Data: {jsonData}");
+
+        using (UnityWebRequest webRequest = new UnityWebRequest(url, "POST"))
+        {
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
+            webRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            webRequest.downloadHandler = new DownloadHandlerBuffer();
+            webRequest.SetRequestHeader("Content-Type", "application/json");
+            webRequest.timeout = 10;
+
+            yield return webRequest.SendWebRequest();
+
+            if (webRequest.result == UnityWebRequest.Result.Success)
+            {
+                Debug.Log($"Update Attributes Response: {webRequest.downloadHandler.text}");
+                // Parse response for success confirmation
+                try
+                {
+                    var response = JsonUtility.FromJson<UpdateResponse>(webRequest.downloadHandler.text);
+                    if (response.success)
+                    {
+                        Debug.Log("Attributes updated successfully in database!");
+                        OnAttributesUpdated?.Invoke(true, "Attributes updated successfully!");
+                    }
+                    else
+                    {
+                        OnAttributesUpdated?.Invoke(false, "Failed to update attributes");
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"Error parsing update response: {e.Message}");
+                    OnAttributesUpdated?.Invoke(false, "Failed to parse update response");
+                }
+            }
+            else
+            {
+                Debug.LogError($"Update Attributes Error: {webRequest.error}");
+                Debug.LogError($"Response Code: {webRequest.responseCode}");
+                OnAttributesUpdated?.Invoke(false, $"Update failed: {webRequest.error}");
+            }
+        }
+    }
+    
+    [System.Serializable]
+    private class UpdateResponse
+    {
+        public bool success;
+        public string message;
+        public int playerId;
     }
     
     private IEnumerator TestAfterDelay()

@@ -73,6 +73,9 @@ public class Login : MonoBehaviour
             // Store attributes
             CurrentPlayerAttributes = attributes;
             
+            // Save data ke PlayerPrefs via DataContainer
+            SavePlayerDataToPrefs(CurrentPlayerData, attributes);
+            
             // Update status text
             if (statusText != null)
             {
@@ -129,6 +132,9 @@ public class Login : MonoBehaviour
                 redSkin = 0,
                 blueSkin = 0
             };
+            
+            // Save default data ke PlayerPrefs
+            SavePlayerDataToPrefs(CurrentPlayerData, CurrentPlayerAttributes);
             
             if (statusText != null)
             {
@@ -188,6 +194,23 @@ public class Login : MonoBehaviour
         backendManager.Login(usernameInput.text, passwordInput.text);
     }
     
+    // Save player data ke PlayerPrefs
+    private void SavePlayerDataToPrefs(BackendManager.PlayerData playerData, BackendManager.PlayerAttributes attributes)
+    {
+        if (playerData == null || attributes == null) return;
+        
+        PlayerPrefs.SetInt("PlayerId", playerData.id);
+        PlayerPrefs.SetString("Username", playerData.username);
+        PlayerPrefs.SetInt("Score", attributes.score);
+        PlayerPrefs.SetInt("Coin", attributes.coin);
+        PlayerPrefs.SetInt("GreenSkin", attributes.greenSkin);
+        PlayerPrefs.SetInt("RedSkin", attributes.redSkin);
+        PlayerPrefs.SetInt("BlueSkin", attributes.blueSkin);
+        PlayerPrefs.Save();
+        
+        Debug.Log($"Player data saved to PlayerPrefs: {playerData.username} (ID: {playerData.id})");
+    }
+    
     // Utility method to access player data from other scripts
     public static bool IsPlayerLoggedIn()
     {
@@ -198,5 +221,15 @@ public class Login : MonoBehaviour
     {
         CurrentPlayerData = null;
         CurrentPlayerAttributes = null;
+        
+        // Clear PlayerPrefs
+        PlayerPrefs.DeleteKey("PlayerId");
+        PlayerPrefs.DeleteKey("Username");
+        PlayerPrefs.DeleteKey("Score");
+        PlayerPrefs.DeleteKey("Coin");
+        PlayerPrefs.DeleteKey("GreenSkin");
+        PlayerPrefs.DeleteKey("RedSkin");
+        PlayerPrefs.DeleteKey("BlueSkin");
+        PlayerPrefs.Save();
     }
 }
